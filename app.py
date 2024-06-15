@@ -7,7 +7,7 @@ company_logo = 'https://blendle.com/img/packaging/android-touch-icon-196x196.png
 
 # Configure streamlit page
 st.set_page_config(
-    page_title="Your Notion Chatbot",
+    page_title="Your Open OS Chatbot",
     page_icon=company_logo
 )
 
