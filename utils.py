@@ -2,12 +2,13 @@ import streamlit as st
 import openai
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.chat_models import ChatOpenAI
-from langchain.vectorstores import FAISS
-from langchain.embeddings import OpenAIEmbeddings
+from langchain_community.chat_models import ChatOpenAI
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.prompts.chat import SystemMessagePromptTemplate
 
+# Set the OpenAI API key from Streamlit secrets
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 @st.cache_resource
@@ -25,11 +26,11 @@ def load_chain():
     llm = ChatOpenAI(temperature=0)
     
     # Load our local FAISS index as a retriever
-    vector_store = FAISS.load_local("faiss_index", embeddings)
+    vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     retriever = vector_store.as_retriever(search_kwargs={"k": 3})
     
     # Create memory 'chat_history' 
-    memory = ConversationBufferWindowMemory(k=3,memory_key="chat_history")
+    memory = ConversationBufferWindowMemory(k=3, memory_key="chat_history")
 
     # Create the Conversational Chain
     chain = ConversationalRetrievalChain.from_llm(llm, 
@@ -51,7 +52,38 @@ def load_chain():
     Helpful Answer:"""
 
     # Add system prompt to chain
-    QA_CHAIN_PROMPT = PromptTemplate(input_variables=["context", "question"],template=template)
+    QA_CHAIN_PROMPT = PromptTemplate(input_variables=["context", "question"], template=template)
     chain.combine_docs_chain.llm_chain.prompt.messages[0] = SystemMessagePromptTemplate(prompt=QA_CHAIN_PROMPT)
 
     return chain
+
+# Initialize and load the chain
+chain = load_chain()
+
+# Streamlit interface to interact with the chain
+st.title("Notion Space Q&A Assistant")
+st.write("Ask any question about the Open OS Notion Space.")
+
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = []
+
+with st.form(key='my_form', clear_on_submit=True):
+    user_input = st.text_input("Your Question:", "")
+    submit_button = st.form_submit_button(label='Ask')
+
+if submit_button and user_input:
+    # Append the user's message to the session state
+    st.session_state['messages'].append({"role": "user", "content": user_input})
+    
+    # Get the response from the chain
+    response = chain(user_input)
+    
+    # Append the AI's response to the session state
+    st.session_state['messages'].append({"role": "assistant", "content": response})
+
+# Display the conversation
+for message in st.session_state['messages']:
+    if message["role"] == "user":
+        st.write(f"**You:** {message['content']}")
+    else:
+        st.write(f"**Assistant:** {message['content']}")
